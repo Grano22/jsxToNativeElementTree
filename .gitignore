@@ -1,5 +1,5 @@
-plugin-transform-react-jsx-nativeElement
+./plugin-transform-react-jsx-nativeElement
 node_modules
 install.bat
-main.jsx
+main.js
 trash.js
