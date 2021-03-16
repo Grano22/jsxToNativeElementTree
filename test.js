@@ -3,15 +3,21 @@ const fs = require("fs");
 const bc = require("@babel/core");
 
 class NativeDOMConverter {
+  constructor() {
+    
+  }
+
   allowedTags = [
 
   ];
 
-  static toNativeJSLine(reactContext, seed=0) {
-      let outputJSCode = "", varName = "rel"+seed;
+  uniqueSeed = 0;
+
+  toNativeJSLine(reactContext, seed=0) {
+      let outputJSCode = "", varName = "rel"+this.uniqueSeed;
       try {
           if(typeof reactContext.type==="symbol" && Symbol.keyFor(reactContext.type)=="react.fragment") {
-            outputJSCode = `let ${varName} = document.createFragment();`;
+            outputJSCode = `let ${varName} = document.createDocumentFragment();`;
           } else if(typeof reactContext.type==="object") {
 
           } else {
@@ -31,30 +37,34 @@ class NativeDOMConverter {
       }
   }
 
-  static toNativeJS(inputReactOutput, pvarName="", gseed = 0, partialCode="") {
+  toNativeJS(inputReactOutput, pvarName="", partialCode="") {
       let outputJSCode = "";
+      if(pvarName==="") this.uniqueSeed = 0;
       try {
           if(Array.isArray(inputReactOutput)) {
               for(let reactContext of inputReactOutput) {
-                  let { outputCode, varName } = NativeDOMConverter.toNativeJSLine(reactContext, gseed);
+                  let { outputCode, varName } = this.toNativeJSLine(reactContext);
                   outputJSCode += outputCode;
                   outputJSCode += `${pvarName}.appendChild(${varName});`;
+                  this.uniqueSeed += 1;
                   if(typeof reactContext.props.children=="object") {
-                      outputJSCode += NativeDOMConverter.toNativeJS(reactContext.props.children, varName, gseed);
+                      outputJSCode += this.toNativeJS(reactContext.props.children, varName);
                       //outputJSCode += `${pvarName}.appendChild(${varName});`;
-                      ++gseed;
+                      
                   } else if(typeof reactContext.props.children=="string") {
-                      outputJSCode += `${varName}.appendChild(document.createTextNode("${reactContext.props.children}"))`;
+                      outputJSCode += `${varName}.appendChild(document.createTextNode("${reactContext.props.children}"));`;
                   }
+
               }
           } else if(typeof inputReactOutput=="object") {
-              let { outputCode, varName } = NativeDOMConverter.toNativeJSLine(inputReactOutput, gseed);
+              let { outputCode, varName } = this.toNativeJSLine(inputReactOutput);
               outputJSCode += outputCode;
+              this.uniqueSeed += 1;
               if(pvarName!="") outputJSCode += `${pvarName}.appendChild(${varName});`;
               if(typeof inputReactOutput.props.children=="object") {
-                  outputJSCode += NativeDOMConverter.toNativeJS(inputReactOutput.props.children, varName, ++gseed);
+                  outputJSCode += this.toNativeJS(inputReactOutput.props.children, varName);
               } else if(typeof inputReactOutput.props.children=="string") {
-                  outputJSCode += `${varName}.appendChild(document.createTextNode("${inputReactOutput.props.children}"))`;
+                  outputJSCode += `${varName}.appendChild(document.createTextNode("${inputReactOutput.props.children}"));`;
               }
           } else throw "";
           return outputJSCode;
@@ -63,6 +73,8 @@ class NativeDOMConverter {
       }
   }
 }
+
+let ndc = new NativeDOMConverter();
 
 fs.readFile("./parsers.jsx", 'utf-8', (err, res)=>{
     try {
@@ -75,7 +87,7 @@ fs.readFile("./parsers.jsx", 'utf-8', (err, res)=>{
         //let sp = eval(resp.code);
         //console.log(sp);
         let iop = eval(resp.code);
-        let JScode = NativeDOMConverter.toNativeJS(iop);
+        let JScode = ndc.toNativeJS(iop);
         console.log(JScode);
       });
     } catch(errorNode) {
